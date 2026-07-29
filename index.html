@@ -2,114 +2,55 @@
 <html lang="it">
 <head>
     <meta charset="UTF-8">
-    <title>Evren City OS - AI Scanner API</title>
-    <!-- Carica face-api.js -->
+    <title>Evren City OS - AI Biometric Engine</title>
     <script defer src="https://cdn.jsdelivr.net/npm/@vladmandic/face-api@1.7.12/dist/face-api.js"></script>
-    <!-- Carica Supabase JS -->
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body style="background: #111; color: #fff; font-family: sans-serif; text-align: center; padding: 50px;">
 
-    <h2 id="status">Inizializzazione IA e caricamento modelli...</h2>
+    <h2 id="status">Inizializzazione motore biometrico...</h2>
     <div id="result" style="display:none;"></div>
 
     <script>
-        // CONFIGURAZIONE SUPABASE (Sostituisci con le tue chiavi)
-        const SUPABASE_URL = 'IL_TUO_SUPABASE_URL';
-        const SUPABASE_KEY = 'IL_TUO_SUPABASE_ANON_KEY';
-        const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
-
         async function start() {
             const statusEl = document.getElementById('status');
             const resultEl = document.getElementById('result');
 
             try {
-                // 1. Carica i modelli di face-api.js
-                statusEl.innerText = "Caricamento modelli biometrici in corso...";
-                await faceapi.nets.ssdMobilenetv1.loadFromUri('https://justadudewhohacks.github.io/face-api.js/models');
-                await faceapi.nets.faceLandmark68Net.loadFromUri('https://justadudewhohacks.github.io/face-api.js/models');
-                await faceapi.nets.faceRecognitionNet.loadFromUri('https://justadudewhohacks.github.io/face-api.js/models');
+                statusEl.innerText = "Caricamento modelli IA...";
+                const MODEL_URL = 'https://cdn.jsdelivr.net/npm/@vladmandic/face-api@1.7.12/model/';
+                
+                await faceapi.nets.ssdMobilenetv1.loadFromUri(MODEL_URL);
+                await faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_URL);
+                await faceapi.nets.faceRecognitionNet.loadFromUri(MODEL_URL);
 
-                // 2. Legge l'URL della foto passato come parametro (es: tuosito.com/?url=LINK_FOTO)
+                // Legge i dati passati via URL dalla POST/GET del bot
                 const urlParams = new URLSearchParams(window.location.search);
                 const fotoUrl = urlParams.get('url');
 
                 if (!fotoUrl) {
-                    statusEl.innerText = "❌ Nessun URL immagine fornito nei parametri.";
+                    statusEl.innerText = "⚠️ Motore pronto.";
                     return;
                 }
 
-                statusEl.innerText = "Analisi del volto nella foto inviata...";
-
-                // 3. Scarica e analizza la foto dell'utente (gestisce anche angolazioni diverse grazie ai landmark)
+                statusEl.innerText = "Analisi del volto in corso...";
                 const queryImage = await faceapi.fetchImage(fotoUrl);
                 const queryDetection = await faceapi.detectSingleFace(queryImage).withFaceLandmarks().withFaceDescriptor();
 
                 if (!queryDetection) {
-                    resultEl.innerText = JSON.stringify({ status: "not_found", message: "Nessun volto rilevato." });
-                    statusEl.innerText = "❌ Nessun volto rilevato nell'immagine.";
-                    return;
-                }
-
-                const queryDescriptor = queryDetection.descriptor;
-                statusEl.innerText = "Confronto con i documenti in database...";
-
-                // 4. Prende tutti i record dalla tua tabella 'public.documents'
-                const { data: documenti, error } = await supabaseClient.from('documents').select('*');
-
-                if (error || !documenti || documenti.length === 0) {
-                    resultEl.innerText = JSON.stringify({ status: "not_found", message: "Nessun documento nel DB." });
-                    statusEl.innerText = "❌ Nessun documento trovato nel database.";
-                    return;
-                }
-
-                let bestMatch = null;
-                let lowestDistance = 0.6; // Soglia di tolleranza biometrica
-
-                // 5. Cicla le foto dei documenti salvati nel database
-                for (let doc of documenti) {
-                    if (!doc.photo_url) continue;
-
-                    try {
-                        const dbImage = await faceapi.fetchImage(doc.photo_url);
-                        const dbDetection = await faceapi.detectSingleFace(dbImage).withFaceLandmarks().withFaceDescriptor();
-
-                        if (dbDetection) {
-                            const distance = faceapi.euclideanDistance(queryDescriptor, dbDetection.descriptor);
-                            
-                            if (distance < lowestDistance) {
-                                lowestDistance = distance;
-                                bestMatch = doc;
-                            }
-                        }
-                    } catch (e) {
-                        console.log("Errore caricamento foto documento ID:", doc.discord_id);
-                    }
-                }
-
-                // 6. Restituisce il risultato in formato JSON strutturato all'interno del div #result
-                if (bestMatch) {
-                    statusEl.innerText = "✅ Corrispondenza trovata!";
-                    resultEl.innerText = JSON.stringify({
-                        status: "success",
-                        discord_id: bestMatch.discord_id,
-                        name: bestMatch.name,
-                        surname: bestMatch.surname,
-                        cf: bestMatch.cf,
-                        doc_number: bestMatch.doc_number,
-                        birth_date: bestMatch.birth_date,
-                        birth_place: bestMatch.birth_place,
-                        distinct_marks: bestMatch.distinct_marks,
-                        photo_url: bestMatch.photo_url,
-                        distance: lowestDistance
-                    });
-                } else {
-                    statusEl.innerText = "❌ Nessuna corrispondenza biometrica valida.";
                     resultEl.innerText = JSON.stringify({ status: "not_found" });
+                    statusEl.innerText = "❌ Nessun volto rilevato.";
+                    return;
                 }
+
+                // Restituisce il descrittore biometrico calcolato al bot Discord
+                resultEl.innerText = JSON.stringify({
+                    status: "success",
+                    descriptor: Array.from(queryDetection.descriptor)
+                });
+                statusEl.innerText = "✅ Elaborazione completata!";
 
             } catch (err) {
-                statusEl.innerText = "❌ Errore critico durante l'elaborazione.";
+                statusEl.innerText = "❌ Errore: " + err.message;
                 resultEl.innerText = JSON.stringify({ status: "error", message: err.toString() });
             }
         }
