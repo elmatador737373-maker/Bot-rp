@@ -3,7 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <title>Evren City OS - AI Biometric Engine</title>
-    <script defer src="https://cdn.jsdelivr.net/npm/@vladmandic/face-api@1.7.12/dist/face-api.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@vladmandic/face-api@1.7.12/dist/face-api.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body style="background: #111; color: #fff; font-family: sans-serif; text-align: center; padding: 50px;">
 
@@ -11,11 +12,25 @@
     <div id="result" style="display:none;"></div>
 
     <script>
+        // Configurazione Supabase tramite variabili d'ambiente o placeholder
+        // Ricordati di impostare NEXT_PUBLIC_SUPABASE_URL e NEXT_PUBLIC_SUPABASE_KEY nelle impostazioni di Vercel
+        const SUPABASE_URL = window.ENV?.SUPABASE_URL || "INSERISCI_URL_QUI";
+        const SUPABASE_KEY = window.ENV?.SUPABASE_KEY || "INSERISCI_KEY_QUI";
+        
+        const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
         async function start() {
             const statusEl = document.getElementById('status');
             const resultEl = document.getElementById('result');
 
             try {
+                let tentativi = 0;
+                while (typeof faceapi === 'undefined') {
+                    if (tentativi > 50) throw new Error("Libreria faceapi non caricata.");
+                    await new Promise(resolve => setTimeout(resolve, 100));
+                    tentativi++;
+                }
+
                 statusEl.innerText = "Caricamento modelli IA...";
                 const MODEL_URL = 'https://cdn.jsdelivr.net/npm/@vladmandic/face-api@1.7.12/model/';
                 
@@ -23,7 +38,6 @@
                 await faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_URL);
                 await faceapi.nets.faceRecognitionNet.loadFromUri(MODEL_URL);
 
-                // Legge i dati passati via URL dalla POST/GET del bot
                 const urlParams = new URLSearchParams(window.location.search);
                 const fotoUrl = urlParams.get('url');
 
@@ -42,12 +56,40 @@
                     return;
                 }
 
-                // Restituisce il descrittore biometrico calcolato al bot Discord
-                resultEl.innerText = JSON.stringify({
-                    status: "success",
-                    descriptor: Array.from(queryDetection.descriptor)
-                });
-                statusEl.innerText = "✅ Elaborazione completata!";
+                statusEl.innerText = "Confronto con il database centrale...";
+                
+                const { data: documenti, error } = await supabaseClient.from('documents').select('*');
+                
+                if (error || !documenti || documenti.length === 0) {
+                    throw new Error("Impossibile accedere al database o nessun documento trovato.");
+                }
+
+                let bestMatch = null;
+                let minDistance = 0.6; // Soglia di tolleranza biometrica
+
+                for (let doc of documenti) {
+                    if (doc.descriptor) {
+                        const dbDescriptor = new Float32Array(doc.descriptor);
+                        const distance = faceapi.euclideanDistance(queryDetection.descriptor, dbDescriptor);
+                        
+                        if (distance < minDistance) {
+                            minDistance = distance;
+                            bestMatch = doc;
+                        }
+                    }
+                }
+
+                if (bestMatch) {
+                    resultEl.innerText = JSON.stringify({
+                        status: "success",
+                        match: bestMatch,
+                        distance: minDistance
+                    });
+                    statusEl.innerText = "✅ Cittadino identificato!";
+                } else {
+                    resultEl.innerText = JSON.stringify({ status: "not_matched" });
+                    statusEl.innerText = "❌ Nessun riscontro nel database.";
+                }
 
             } catch (err) {
                 statusEl.innerText = "❌ Errore: " + err.message;
@@ -55,7 +97,7 @@
             }
         }
 
-        start();
+        window.onload = start;
     </script>
 </body>
 </html>
