@@ -360,9 +360,10 @@
         .discord-btn-preview {
             background-color: #4e5058;
             color: white;
-            padding: 6px 10px;
+            padding: 6px 12px;
             border-radius: 4px;
-            font-size: 0.75rem;
+            font-size: 0.8rem;
+            font-weight: 500;
             display: inline-flex;
             align-items: center;
             gap: 4px;
@@ -394,7 +395,7 @@
 
             <div class="form-group">
                 <label>URL Webhook Discord Destination</label>
-                <input type="url" id="target-webhook-url" placeholder="Incolla qui l'URL del tuo Webhook Discord">
+                <input type="url" id="target-webhook-url" value="https://discord.com/api/webhooks/1533164184299114606/sjRPIh-IPuFTwOGXGhbNHeij-ixpi5dI9PegE8SaniJRbXqlQo9WLw2xV6YOJLyRr16x">
             </div>
 
             <div class="form-group">
@@ -414,7 +415,7 @@
 
             <div class="form-group">
                 <label>Descrizione / Benvenuto</label>
-                <textarea id="embed-desc" oninput="updatePreview()">Benvenuto su Evren City! Per garantire il miglior Roleplay ed evitare sanzioni, consulta qui sotto tutti i regolamenti ufficiali del server aggiornati.</textarea>
+                <textarea id="embed-desc" oninput="updatePreview()">Benvenuto su Evren City! Per consultare i regolamenti ufficiali del server, clicca sui bottoni qui sotto per aprire direttamente i documenti.</textarea>
             </div>
 
             <div class="form-group">
@@ -431,12 +432,12 @@
             </div>
 
             <div class="form-group">
-                <label>🔗 Bottoni Regolamenti</label>
+                <label>🔗 Bottoni Link Nativi</label>
                 <div class="buttons-list" id="buttons-container"></div>
                 <button type="button" class="secondary-btn" onclick="addButtonInput()">+ Aggiungi Bottone Link</button>
             </div>
 
-            <button onclick="sendWebhookMessage()" style="font-size: 1.1rem; padding: 16px; margin-top: 10px;">🚀 Invia Webhook a Discord</button>
+            <button onclick="sendWebhookMessage()" style="font-size: 1.1rem; padding: 16px; margin-top: 10px;">🚀 Invia Webhook con Bottoni Nativi</button>
         </div>
 
         <div class="panel">
@@ -469,7 +470,7 @@
         const defaultEvrenPreset = {
             id: 'evren-default-001',
             name: '⭐ Evren City Regolamenti (Default)',
-            url: ''
+            url: 'https://discord.com/api/webhooks/1533164184299114606/sjRPIh-IPuFTwOGXGhbNHeij-ixpi5dI9PegE8SaniJRbXqlQo9WLw2xV6YOJLyRr16x'
         };
 
         const defaultButtons = [
@@ -480,7 +481,7 @@
             { label: '🚘 Magazzino Veicoli', url: 'https://docs.google.com/document/d/12xrczBasoBIc1MUiffdCYptsW-w-NRJCGXKrbalJoc/edit?usp=drivesdk' },
             { label: '🌿 Spaccio Personale', url: 'https://docs.google.com/document/d/1-o05Rf_pVRcJOoOyrh4jFEDBhuYMEI2P4Ia3C7nEsE/edit?usp=drivesdk' },
             { label: '💊 Traffico di Droga', url: 'https://docs.google.com/document/d/1-YZkoKUxS_qE8xqrlmSqBHz22_UdyhiRzHMDS78zM/edit?usp=drivesdk' },
-            { label: '🎲 Casinò Clandestini', url: 'https://docs.google.com/document/d/1HvBxGJLZAhzEVG9mtxDnEZYS4emC9_cuTU35_IRbZbE/edit?usp=drivesdk' },
+            { label: '🎲 Casinò Clandestini', url: 'https://docs.google.com/document/d/11qZp6ZM_210HXzAKOIFcGOkV-7RvDe-IkKaEVrYSUhY/edit?usp=drivesdk' },
             { label: '💰 Soldi Sporchi', url: 'https://docs.google.com/document/d/1HvBxGJLZAhzEVG9mtxDnEZYS4emC9_cuTU35_IRbZbE/edit?usp=drivesdk' },
             { label: '📄 Documenti Falsi', url: 'https://docs.google.com/document/d/1-7dbNYmPdzdVsH4hbLFJuvoKcN3rZnX4MMnIVSNASo/edit?usp=drivesdk' },
             { label: '💵 Soldi Falsi 2026', url: 'https://docs.google.com/document/d/11L6JaSdR7g6SB7AniWSlEeA9IJxDYWssKAzu6WD4PYc/edit?usp=drivesdk' },
@@ -601,30 +602,45 @@
                 if (b.label) {
                     const btnEl = document.createElement('div');
                     btnEl.className = 'discord-btn-preview';
-                    btnEl.innerHTML = `🔗 ${b.label}`;
+                    btnEl.innerHTML = `↗️ ${b.label}`;
                     btnPreviewContainer.appendChild(btnEl);
                 }
             });
         }
 
         async function sendWebhookMessage() {
-            const webhookUrl = document.getElementById('target-webhook-url').value.trim();
+            let webhookUrl = document.getElementById('target-webhook-url').value.trim();
             if (!webhookUrl) return alert('Incolla l\'URL del tuo Webhook prima di inviare!');
+
+            // Assicura che l'URL contenga il parametro per attivare i bottoni
+            if (!webhookUrl.includes('with_components=true')) {
+                webhookUrl += (webhookUrl.includes('?') ? '&' : '?') + 'with_components=true';
+            }
 
             const botName = document.getElementById('bot-name').value;
             const botAvatar = document.getElementById('bot-avatar').value;
             const title = document.getElementById('embed-title').value;
-            let desc = document.getElementById('embed-desc').value;
+            const desc = document.getElementById('embed-desc').value;
             const colorHex = document.getElementById('embed-color').value;
             const colorInt = parseInt(colorHex.replace('#', ''), 16);
             const footer = document.getElementById('embed-footer').value;
 
-            let buttonsFormatted = "";
-            if (linkButtons.length > 0) {
-                buttonsFormatted = "\n\n**📑 REGOLAMENTI DISPONIBILI:**\n" + linkButtons
-                    .filter(b => b.label && b.url)
-                    .map(b => `• [${b.label}](${b.url})`)
-                    .join('\n');
+            // Raggruppa i bottoni in Action Rows (massimo 4 o 5 bottoni per riga)
+            const validButtons = linkButtons.filter(b => b.label && b.url);
+            const actionRows = [];
+            const chunkSize = 4; // 4 bottoni per riga
+
+            for (let i = 0; i < validButtons.length; i += chunkSize) {
+                const chunk = validButtons.slice(i, i + chunkSize);
+                actionRows.push({
+                    type: 1, // Action Row
+                    components: chunk.map(b => ({
+                        type: 2,        // Button Component
+                        style: 5,       // Link Button Style
+                        label: b.label,
+                        url: b.url
+                    }))
+                });
             }
 
             const payload = {
@@ -633,12 +649,13 @@
                 embeds: [
                     {
                         title: title,
-                        description: desc + buttonsFormatted,
+                        description: desc,
                         color: colorInt,
                         footer: { text: footer },
                         timestamp: new Date().toISOString()
                     }
-                ]
+                ],
+                components: actionRows
             };
 
             try {
@@ -649,13 +666,14 @@
                 });
 
                 if (response.ok || response.status === 204) {
-                    alert('✅ Messaggio inviato con successo a Discord!');
+                    alert('✅ Messaggio inviato con successo con tutti i Bottoni Nativi!');
                 } else {
-                    alert(`❌ Errore (${response.status}). Controlla l'URL del Webhook.`);
+                    const errorMsg = await response.text();
+                    alert(`❌ Errore Discord (${response.status}): ${errorMsg}`);
                 }
             } catch (err) {
                 console.error(err);
-                alert('❌ Errore di rete o URL non valido.');
+                alert('❌ Errore di connessione o URL Webhook non valido.');
             }
         }
     </script>
