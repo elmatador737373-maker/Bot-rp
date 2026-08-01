@@ -2,102 +2,623 @@
 <html lang="it">
 <head>
     <meta charset="UTF-8">
-    <title>Evren City OS - AI Biometric Engine</title>
-    <script src="https://cdn.jsdelivr.net/npm/@vladmandic/face-api@1.7.12/dist/face-api.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-</head>
-<body style="background: #111; color: #fff; font-family: sans-serif; text-align: center; padding: 50px;">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Discord Webhook Sender & Manager - Evren City</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-primary: #313338;
+            --bg-secondary: #2b2d31;
+            --bg-tertiary: #1e1f22;
+            --brand-color: #5865f2;
+            --brand-color-hover: #4752c4;
+            --text-normal: #dbdee1;
+            --text-muted: #949ba4;
+            --text-header: #f2f3f5;
+            --border-radius: 8px;
+            --danger: #da373c;
+            --success: #23a55a;
+        }
 
-    <h2 id="status">Inizializzazione motore biometrico...</h2>
-    <div id="result" style="display:none;"></div>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Inter', sans-serif;
+        }
 
-    <script>
-        // Configurazione Supabase tramite variabili d'ambiente o placeholder
-        // Ricordati di impostare NEXT_PUBLIC_SUPABASE_URL e NEXT_PUBLIC_SUPABASE_KEY nelle impostazioni di Vercel
-        const SUPABASE_URL = window.ENV?.SUPABASE_URL || "INSERISCI_URL_QUI";
-        const SUPABASE_KEY = window.ENV?.SUPABASE_KEY || "INSERISCI_KEY_QUI";
-        
-        const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+        body {
+            background-color: var(--bg-tertiary);
+            color: var(--text-normal);
+            display: flex;
+            min-height: 100vh;
+        }
 
-        async function start() {
-            const statusEl = document.getElementById('status');
-            const resultEl = document.getElementById('result');
+        /* Sidebar per la gestione dei Webhook */
+        .sidebar {
+            width: 320px;
+            background-color: var(--bg-secondary);
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+            border-right: 1px solid rgba(255, 255, 255, 0.05);
+        }
 
-            try {
-                let tentativi = 0;
-                while (typeof faceapi === 'undefined') {
-                    if (tentativi > 50) throw new Error("Libreria faceapi non caricata.");
-                    await new Promise(resolve => setTimeout(resolve, 100));
-                    tentativi++;
-                }
+        .sidebar h2 {
+            color: var(--text-header);
+            font-size: 1.1rem;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
 
-                statusEl.innerText = "Caricamento modelli IA...";
-                const MODEL_URL = 'https://cdn.jsdelivr.net/npm/@vladmandic/face-api@1.7.12/model/';
-                
-                await faceapi.nets.ssdMobilenetv1.loadFromUri(MODEL_URL);
-                await faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_URL);
-                await faceapi.nets.faceRecognitionNet.loadFromUri(MODEL_URL);
+        .saved-webhooks {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            overflow-y: auto;
+            flex-grow: 1;
+        }
 
-                const urlParams = new URLSearchParams(window.location.search);
-                const fotoUrl = urlParams.get('url');
+        .webhook-card {
+            background-color: var(--bg-primary);
+            padding: 12px;
+            border-radius: var(--border-radius);
+            cursor: pointer;
+            transition: background 0.2s;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
 
-                if (!fotoUrl) {
-                    statusEl.innerText = "⚠️ Motore pronto.";
-                    return;
-                }
+        .webhook-card:hover, .webhook-card.active {
+            background-color: #404249;
+        }
 
-                statusEl.innerText = "Analisi del volto in corso...";
-                const queryImage = await faceapi.fetchImage(fotoUrl);
-                const queryDetection = await faceapi.detectSingleFace(queryImage).withFaceLandmarks().withFaceDescriptor();
+        .webhook-info {
+            overflow: hidden;
+        }
 
-                if (!queryDetection) {
-                    resultEl.innerText = JSON.stringify({ status: "not_found" });
-                    statusEl.innerText = "❌ Nessun volto rilevato.";
-                    return;
-                }
+        .webhook-name {
+            font-weight: 600;
+            color: var(--text-header);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
 
-                statusEl.innerText = "Confronto con il database centrale...";
-                
-                const { data: documenti, error } = await supabaseClient.from('documents').select('*');
-                
-                if (error || !documenti || documenti.length === 0) {
-                    throw new Error("Impossibile accedere al database o nessun documento trovato.");
-                }
+        .webhook-url-preview {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
 
-                let bestMatch = null;
-                let minDistance = 0.6; // Soglia di tolleranza biometrica
+        /* Area Principale Editor */
+        .main-content {
+            flex-grow: 1;
+            padding: 30px;
+            overflow-y: auto;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 30px;
+        }
 
-                for (let doc of documenti) {
-                    if (doc.descriptor) {
-                        const dbDescriptor = new Float32Array(doc.descriptor);
-                        const distance = faceapi.euclideanDistance(queryDetection.descriptor, dbDescriptor);
-                        
-                        if (distance < minDistance) {
-                            minDistance = distance;
-                            bestMatch = doc;
-                        }
-                    }
-                }
-
-                if (bestMatch) {
-                    resultEl.innerText = JSON.stringify({
-                        status: "success",
-                        match: bestMatch,
-                        distance: minDistance
-                    });
-                    statusEl.innerText = "✅ Cittadino identificato!";
-                } else {
-                    resultEl.innerText = JSON.stringify({ status: "not_matched" });
-                    statusEl.innerText = "❌ Nessun riscontro nel database.";
-                }
-
-            } catch (err) {
-                statusEl.innerText = "❌ Errore: " + err.message;
-                resultEl.innerText = JSON.stringify({ status: "error", message: err.toString() });
+        @media (max-width: 1024px) {
+            .main-content {
+                grid-template-columns: 1fr;
             }
         }
 
-        window.onload = start;
+        .panel {
+            background-color: var(--bg-secondary);
+            padding: 24px;
+            border-radius: var(--border-radius);
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        .panel h3 {
+            color: var(--text-header);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            padding-bottom: 10px;
+        }
+
+        .form-group {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        label {
+            font-size: 0.85rem;
+            font-weight: 600;
+            color: var(--text-muted);
+            text-transform: uppercase;
+        }
+
+        input, textarea {
+            background-color: var(--bg-tertiary);
+            border: 1px solid rgba(0, 0, 0, 0.3);
+            border-radius: 4px;
+            padding: 10px;
+            color: var(--text-header);
+            font-size: 0.95rem;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+
+        input:focus, textarea:focus {
+            border-color: var(--brand-color);
+        }
+
+        textarea {
+            resize: vertical;
+            min-height: 100px;
+        }
+
+        .color-picker-wrapper {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        input[type="color"] {
+            padding: 0;
+            width: 40px;
+            height: 40px;
+            border: none;
+            cursor: pointer;
+            border-radius: 4px;
+        }
+
+        button {
+            background-color: var(--brand-color);
+            color: white;
+            border: none;
+            border-radius: 4px;
+            padding: 12px 20px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        button:hover {
+            background-color: var(--brand-color-hover);
+        }
+
+        button.danger-btn {
+            background-color: var(--danger);
+            padding: 6px 10px;
+            font-size: 0.8rem;
+        }
+
+        button.danger-btn:hover {
+            background-color: #a1282c;
+        }
+
+        button.secondary-btn {
+            background-color: #4e5058;
+        }
+
+        button.secondary-btn:hover {
+            background-color: #6d6f78;
+        }
+
+        /* Sezione Bottoni Links */
+        .buttons-list {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            max-height: 250px;
+            overflow-y: auto;
+        }
+
+        .button-row {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+
+        .button-row input {
+            flex: 1;
+        }
+
+        /* Preview stile Discord */
+        .preview-container {
+            background-color: var(--bg-primary);
+            padding: 16px;
+            border-radius: 8px;
+            margin-top: 10px;
+        }
+
+        .discord-message {
+            display: flex;
+            gap: 16px;
+        }
+
+        .discord-avatar {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background-color: var(--brand-color);
+            background-size: cover;
+            background-position: center;
+            flex-shrink: 0;
+        }
+
+        .discord-content {
+            flex-grow: 1;
+        }
+
+        .discord-author {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 4px;
+        }
+
+        .author-name {
+            font-weight: 600;
+            color: var(--text-header);
+        }
+
+        .bot-tag {
+            background-color: var(--brand-color);
+            color: white;
+            font-size: 0.625rem;
+            padding: 1px 4px;
+            border-radius: 3px;
+            font-weight: 500;
+        }
+
+        .discord-embed {
+            border-left: 4px solid var(--brand-color);
+            background-color: var(--bg-secondary);
+            padding: 12px 16px;
+            border-radius: 4px;
+            margin-top: 8px;
+            max-width: 520px;
+        }
+
+        .embed-title {
+            font-weight: 700;
+            color: var(--text-header);
+            margin-bottom: 8px;
+        }
+
+        .embed-description {
+            font-size: 0.9rem;
+            white-space: pre-line;
+            color: var(--text-normal);
+        }
+
+        .embed-footer {
+            margin-top: 8px;
+            font-size: 0.75rem;
+            color: var(--text-muted);
+        }
+
+        .discord-buttons-preview {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-top: 8px;
+        }
+
+        .discord-btn-preview {
+            background-color: #4e5058;
+            color: white;
+            padding: 6px 12px;
+            border-radius: 3px;
+            font-size: 0.8rem;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            pointer-events: none;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="sidebar">
+        <h2>📌 Webhook Salvati</h2>
+        
+        <div class="form-group">
+            <input type="text" id="new-webhook-name" placeholder="Nome Webhook">
+            <input type="url" id="new-webhook-url" placeholder="URL Webhook Discord">
+            <button onclick="saveWebhook()">+ Salva Nuovo Webhook</button>
+        </div>
+
+        <div class="saved-webhooks" id="webhook-list"></div>
+    </div>
+
+    <div class="main-content">
+        
+        <div class="panel">
+            <h3>⚙️ Personalizza Messaggio</h3>
+
+            <div class="form-group">
+                <label>URL Webhook Discord Destination</label>
+                <input type="url" id="target-webhook-url" placeholder="Incolla qui l'URL del tuo Webhook Discord">
+            </div>
+
+            <div class="form-group">
+                <label>Nome Bot / Mittente</label>
+                <input type="text" id="bot-name" value="Evren City - System Info" oninput="updatePreview()">
+            </div>
+
+            <div class="form-group">
+                <label>Avatar URL (Icona Bot)</label>
+                <input type="url" id="bot-avatar" placeholder="https://..." oninput="updatePreview()">
+            </div>
+
+            <hr style="border-color: rgba(255,255,255,0.05)">
+
+            <div class="form-group">
+                <label>Titolo Embed</label>
+                <input type="text" id="embed-title" value="📜 TUTTI I REGOLAMENTI DI EVREN CITY 2026" oninput="updatePreview()">
+            </div>
+
+            <div class="form-group">
+                <label>Descrizione / Benvenuto</label>
+                <textarea id="embed-desc" oninput="updatePreview()">Benvenuto su Evren City! Per garantire il miglior Roleplay ed evitare sanzioni, consulta qui sotto tutti i regolamenti ufficiali del server aggiornati.</textarea>
+            </div>
+
+            <div class="form-group">
+                <label>Colore Bordo Embed</label>
+                <div class="color-picker-wrapper">
+                    <input type="color" id="embed-color" value="#5865f2" oninput="updatePreview()">
+                    <span id="color-hex">#5865f2</span>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label>Testo Footer (In basso)</label>
+                <input type="text" id="embed-footer" value="Evren City Roleplay • Tutti i diritti riservati" oninput="updatePreview()">
+            </div>
+
+            <hr style="border-color: rgba(255,255,255,0.05)">
+
+            <div class="form-group">
+                <label>🔗 Bottoni Regolamenti</label>
+                <div class="buttons-list" id="buttons-container"></div>
+                <button type="button" class="secondary-btn" onclick="addButtonInput()">+ Aggiungi Nuovo Bottone Link</button>
+            </div>
+
+            <button onclick="sendWebhookMessage()" style="font-size: 1.1rem; padding: 15px;">🚀 Invia Webhook a Discord</button>
+        </div>
+
+        <div class="panel">
+            <h3>👁️ Anteprima Live Discord</h3>
+
+            <div class="preview-container">
+                <div class="discord-message">
+                    <div class="discord-avatar" id="pv-avatar"></div>
+                    <div class="discord-content">
+                        <div class="discord-author">
+                            <span class="author-name" id="pv-author">Evren City - System Info</span>
+                            <span class="bot-tag">BOT</span>
+                        </div>
+
+                        <div class="discord-embed" id="pv-embed">
+                            <div class="embed-title" id="pv-title">📜 TUTTI I REGOLAMENTI DI EVREN CITY</div>
+                            <div class="embed-description" id="pv-desc">Benvenuto nel server!</div>
+                            <div class="embed-footer" id="pv-footer">Evren City Roleplay</div>
+                        </div>
+
+                        <div class="discord-buttons-preview" id="pv-buttons"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <script>
+        // Preset dei regolamenti dal video salvato di default
+        const defaultEvrenPreset = {
+            id: 'evren-default-001',
+            name: '⭐ Evren City Regolamenti (Default)',
+            url: '' // L'utente incollerà il suo URL webhook qui
+        };
+
+        const defaultButtons = [
+            { label: '📜 Criminalità 2026', url: 'https://docs.google.com/document/d/1OIpcURhTge_V8MbKCxDzDecSgU3OsJqdB3bT1yS4biA/edit?usp=drivesdk' },
+            { label: '🚨 Rapine Evren', url: 'https://docs.google.com/document/d/14ASIHexwouo6Kr2In3cyHGUnp4Sd-PwJOjOFoFLcC9c/edit?usp=drivesdk' },
+            { label: '⚔️ Traffico d\'Armi', url: 'https://docs.google.com/document/d/13DjTK1qUUrgj_FYwwGR8ZZm4Mremo31OEtBAM3-UTk/edit?usp=drivesdk' },
+            { label: '👔 Merci Contraffatte', url: 'https://docs.google.com/document/d/1-uCNWKJIw1yTWREhUjbp7zLT-slAIfcZD-WPySSxs/edit?usp=drivesdk' },
+            { label: '🚘 Magazzino Veicoli', url: 'https://docs.google.com/document/d/12xrczBasoBIc1MUiffdCYptsW-w-NRJCGXKrbalJoc/edit?usp=drivesdk' },
+            { label: '🌿 Spaccio Personale', url: 'https://docs.google.com/document/d/1-o05Rf_pVRcJOoOyrh4jFEDBhuYMEI2P4Ia3C7nEsE/edit?usp=drivesdk' },
+            { label: '💊 Traffico di Droga', url: 'https://docs.google.com/document/d/1-YZkoKUxS_qE8xqrlmSqBHz22_UdyhiRzHMDS78zM/edit?usp=drivesdk' },
+            { label: '🎲 Casinò Clandestini', url: 'https://docs.google.com/document/d/1HvBxGJLZAhzEVG9mtxDnEZYS4emC9_cuTU35_IRbZbE/edit?usp=drivesdk' },
+            { label: '💰 Soldi Sporchi', url: 'https://docs.google.com/document/d/1HvBxGJLZAhzEVG9mtxDnEZYS4emC9_cuTU35_IRbZbE/edit?usp=drivesdk' },
+            { label: '📄 Documenti Falsi', url: 'https://docs.google.com/document/d/1-7dbNYmPdzdVsH4hbLFJuvoKcN3rZnX4MMnIVSNASo/edit?usp=drivesdk' },
+            { label: '💵 Soldi Falsi 2026', url: 'https://docs.google.com/document/d/11L6JaSdR7g6SB7AniWSlEeA9IJxDYWssKAzu6WD4PYc/edit?usp=drivesdk' },
+            { label: '📊 Regolamento Tasse', url: 'https://docs.google.com/document/d/11vijwCaZRjB2BhNtAKceZ8JHDF_9cKuPvRpk_DDIsg/edit?usp=drivesdk' }
+        ];
+
+        let savedWebhooks = JSON.parse(localStorage.getItem('evren_webhooks')) || [];
+        
+        // Assicura che il preset di default sia sempre presente nella lista
+        if (!savedWebhooks.some(w => w.id === defaultEvrenPreset.id)) {
+            savedWebhooks.unshift(defaultEvrenPreset);
+        }
+
+        let linkButtons = [...defaultButtons];
+
+        window.onload = () => {
+            renderWebhooks();
+            renderButtonsInputs();
+            updatePreview();
+        };
+
+        // --- GESTIONE WEBHOOK SALVATI ---
+        function saveWebhook() {
+            const name = document.getElementById('new-webhook-name').value.trim();
+            const url = document.getElementById('new-webhook-url').value.trim();
+
+            if (!name || !url) return alert('Inserisci sia un nome che un URL per il webhook!');
+
+            savedWebhooks.push({ id: 'wh-' + Date.now(), name, url });
+            localStorage.setItem('evren_webhooks', JSON.stringify(savedWebhooks));
+            
+            document.getElementById('new-webhook-name').value = '';
+            document.getElementById('new-webhook-url').value = '';
+            
+            renderWebhooks();
+        }
+
+        function deleteWebhook(id, event) {
+            event.stopPropagation();
+            savedWebhooks = savedWebhooks.filter(w => w.id !== id);
+            localStorage.setItem('evren_webhooks', JSON.stringify(savedWebhooks));
+            renderWebhooks();
+        }
+
+        function selectWebhook(url) {
+            if(url) {
+                document.getElementById('target-webhook-url').value = url;
+            }
+        }
+
+        function renderWebhooks() {
+            const list = document.getElementById('webhook-list');
+            list.innerHTML = '';
+            savedWebhooks.forEach(w => {
+                const card = document.createElement('div');
+                card.className = 'webhook-card';
+                card.onclick = () => selectWebhook(w.url);
+                card.innerHTML = `
+                    <div class="webhook-info">
+                        <div class="webhook-name">${w.name}</div>
+                        <div class="webhook-url-preview">${w.url || 'Nessun URL impostato'}</div>
+                    </div>
+                    ${w.id !== defaultEvrenPreset.id ? `<button class="danger-btn" onclick="deleteWebhook('${w.id}', event)">X</button>` : ''}
+                `;
+                list.appendChild(card);
+            });
+        }
+
+        // --- GESTIONE BOTTONI LINK ---
+        function renderButtonsInputs() {
+            const container = document.getElementById('buttons-container');
+            container.innerHTML = '';
+
+            linkButtons.forEach((btn, index) => {
+                const row = document.createElement('div');
+                row.className = 'button-row';
+                row.innerHTML = `
+                    <input type="text" placeholder="Testo Bottone" value="${btn.label}" oninput="updateButtonData(${index}, 'label', this.value)">
+                    <input type="url" placeholder="URL Link" value="${btn.url}" oninput="updateButtonData(${index}, 'url', this.value)">
+                    <button type="button" class="danger-btn" onclick="removeButton(${index})">X</button>
+                `;
+                container.appendChild(row);
+            });
+            updatePreview();
+        }
+
+        function addButtonInput() {
+            linkButtons.push({ label: 'Nuovo Link', url: 'https://google.com' });
+            renderButtonsInputs();
+        }
+
+        function updateButtonData(index, field, value) {
+            linkButtons[index][field] = value;
+            updatePreview();
+        }
+
+        function removeButton(index) {
+            linkButtons.splice(index, 1);
+            renderButtonsInputs();
+        }
+
+        // --- LIVE PREVIEW UPDATE ---
+        function updatePreview() {
+            const botName = document.getElementById('bot-name').value || 'Discord Bot';
+            const botAvatar = document.getElementById('bot-avatar').value || 'https://cdn.discordapp.com/embed/avatars/0.png';
+            const title = document.getElementById('embed-title').value;
+            const desc = document.getElementById('embed-desc').value;
+            const color = document.getElementById('embed-color').value;
+            const footer = document.getElementById('embed-footer').value;
+
+            document.getElementById('pv-author').innerText = botName;
+            document.getElementById('pv-avatar').style.backgroundImage = `url('${botAvatar}')`;
+            document.getElementById('pv-title').innerText = title;
+            document.getElementById('pv-desc').innerText = desc;
+            document.getElementById('pv-footer').innerText = footer;
+            document.getElementById('pv-embed').style.borderColor = color;
+            document.getElementById('color-hex').innerText = color;
+
+            // Renderizza bottoni nell'anteprima
+            const btnPreviewContainer = document.getElementById('pv-buttons');
+            btnPreviewContainer.innerHTML = '';
+            linkButtons.forEach(b => {
+                if (b.label) {
+                    const btnEl = document.createElement('div');
+                    btnEl.className = 'discord-btn-preview';
+                    btnEl.innerHTML = `🔗 ${b.label}`;
+                    btnPreviewContainer.appendChild(btnEl);
+                }
+            });
+        }
+
+        // --- INVIO DEL MESSAGGIO AL WEBHOOK ---
+        async function sendWebhookMessage() {
+            const webhookUrl = document.getElementById('target-webhook-url').value.trim();
+            if (!webhookUrl) return alert('Incolla il tuo URL Webhook Discord prima di inviare!');
+
+            const botName = document.getElementById('bot-name').value;
+            const botAvatar = document.getElementById('bot-avatar').value;
+            const title = document.getElementById('embed-title').value;
+            let desc = document.getElementById('embed-desc').value;
+            const colorHex = document.getElementById('embed-color').value;
+            const colorInt = parseInt(colorHex.replace('#', ''), 16);
+            const footer = document.getElementById('embed-footer').value;
+
+            // Costruzione lista dei link formattati
+            let buttonsFormatted = "";
+            if (linkButtons.length > 0) {
+                buttonsFormatted = "\n\n**📑 REGOLAMENTI DISPONIBILI:**\n" + linkButtons
+                    .filter(b => b.label && b.url)
+                    .map(b => `• [${b.label}](${b.url})`)
+                    .join('\n');
+            }
+
+            const payload = {
+                username: botName,
+                avatar_url: botAvatar,
+                embeds: [
+                    {
+                        title: title,
+                        description: desc + buttonsFormatted,
+                        color: colorInt,
+                        footer: { text: footer },
+                        timestamp: new Date().toISOString()
+                    }
+                ]
+            };
+
+            try {
+                const response = await fetch(webhookUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+
+                if (response.ok || response.status === 204) {
+                    alert('✅ Messaggio inviato con successo al tuo canale Discord!');
+                } else {
+                    alert(`❌ Errore durante l'invio (${response.status}). Verifica l'URL del Webhook.`);
+                }
+            } catch (err) {
+                console.error(err);
+                alert('❌ Si è verificato un errore di connessione. Controlla l\'URL del Webhook.');
+            }
+        }
     </script>
 </body>
 </html>
