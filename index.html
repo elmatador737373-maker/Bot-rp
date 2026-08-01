@@ -2,8 +2,8 @@
 <html lang="it">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Discord Webhook Sender & Manager - Evren City</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Discord Webhook Manager - Evren City</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
         :root {
@@ -15,7 +15,7 @@
             --text-normal: #dbdee1;
             --text-muted: #949ba4;
             --text-header: #f2f3f5;
-            --border-radius: 8px;
+            --border-radius: 12px;
             --danger: #da373c;
             --success: #23a55a;
         }
@@ -25,29 +25,83 @@
             margin: 0;
             padding: 0;
             font-family: 'Inter', sans-serif;
+            -webkit-tap-highlight-color: transparent;
         }
 
         body {
             background-color: var(--bg-tertiary);
             color: var(--text-normal);
             display: flex;
+            flex-direction: column;
             min-height: 100vh;
+        }
+
+        /* App Bar Superiore per Mobile */
+        .app-header {
+            background-color: var(--bg-secondary);
+            padding: 16px 20px;
+            text-align: center;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+
+        .app-header h1 {
+            font-size: 1.1rem;
+            color: var(--text-header);
+            font-weight: 700;
+        }
+
+        /* Main Container */
+        .container {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+            padding: 16px;
+            max-width: 1200px;
+            margin: 0 auto;
+            width: 100%;
+        }
+
+        /* Layout Desktop / Tablet */
+        @media (min-width: 900px) {
+            body {
+                flex-direction: row;
+            }
+
+            .sidebar {
+                width: 320px;
+                min-width: 320px;
+                height: 100vh;
+                position: sticky;
+                top: 0;
+            }
+
+            .container {
+                display: grid;
+                grid-template-columns: 1fr 1fr;
+                padding: 30px;
+            }
+
+            .app-header {
+                display: none;
+            }
         }
 
         /* Sidebar per la gestione dei Webhook */
         .sidebar {
-            width: 320px;
             background-color: var(--bg-secondary);
             padding: 20px;
             display: flex;
             flex-direction: column;
-            gap: 20px;
-            border-right: 1px solid rgba(255, 255, 255, 0.05);
+            gap: 16px;
+            border-radius: var(--border-radius);
         }
 
         .sidebar h2 {
             color: var(--text-header);
-            font-size: 1.1rem;
+            font-size: 1rem;
             text-transform: uppercase;
             letter-spacing: 0.5px;
         }
@@ -56,22 +110,24 @@
             display: flex;
             flex-direction: column;
             gap: 10px;
+            max-height: 200px;
             overflow-y: auto;
-            flex-grow: 1;
         }
 
         .webhook-card {
             background-color: var(--bg-primary);
-            padding: 12px;
-            border-radius: var(--border-radius);
+            padding: 14px;
+            border-radius: 8px;
             cursor: pointer;
-            transition: background 0.2s;
             display: flex;
             justify-content: space-between;
             align-items: center;
+            border: 1px solid transparent;
+            transition: all 0.2s;
         }
 
-        .webhook-card:hover, .webhook-card.active {
+        .webhook-card:active {
+            scale: 0.98;
             background-color: #404249;
         }
 
@@ -82,9 +138,7 @@
         .webhook-name {
             font-weight: 600;
             color: var(--text-header);
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
+            font-size: 0.95rem;
         }
 
         .webhook-url-preview {
@@ -95,34 +149,20 @@
             text-overflow: ellipsis;
         }
 
-        /* Area Principale Editor */
-        .main-content {
-            flex-grow: 1;
-            padding: 30px;
-            overflow-y: auto;
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 30px;
-        }
-
-        @media (max-width: 1024px) {
-            .main-content {
-                grid-template-columns: 1fr;
-            }
-        }
-
+        /* Pannelli Generali */
         .panel {
             background-color: var(--bg-secondary);
-            padding: 24px;
+            padding: 20px;
             border-radius: var(--border-radius);
             display: flex;
             flex-direction: column;
-            gap: 20px;
+            gap: 18px;
         }
 
         .panel h3 {
             color: var(--text-header);
-            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            font-size: 1.1rem;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.08);
             padding-bottom: 10px;
         }
 
@@ -133,8 +173,8 @@
         }
 
         label {
-            font-size: 0.85rem;
-            font-weight: 600;
+            font-size: 0.8rem;
+            font-weight: 700;
             color: var(--text-muted);
             text-transform: uppercase;
         }
@@ -142,12 +182,12 @@
         input, textarea {
             background-color: var(--bg-tertiary);
             border: 1px solid rgba(0, 0, 0, 0.3);
-            border-radius: 4px;
-            padding: 10px;
+            border-radius: 8px;
+            padding: 12px 14px;
             color: var(--text-header);
-            font-size: 0.95rem;
+            font-size: 1rem;
             outline: none;
-            transition: border-color 0.2s;
+            width: 100%;
         }
 
         input:focus, textarea:focus {
@@ -156,92 +196,98 @@
 
         textarea {
             resize: vertical;
-            min-height: 100px;
+            min-height: 90px;
         }
 
         .color-picker-wrapper {
             display: flex;
             align-items: center;
-            gap: 10px;
+            gap: 12px;
         }
 
         input[type="color"] {
             padding: 0;
-            width: 40px;
-            height: 40px;
+            width: 48px;
+            height: 48px;
             border: none;
             cursor: pointer;
-            border-radius: 4px;
+            border-radius: 8px;
+            background: none;
         }
 
         button {
             background-color: var(--brand-color);
             color: white;
             border: none;
-            border-radius: 4px;
-            padding: 12px 20px;
+            border-radius: 8px;
+            padding: 14px 20px;
             font-weight: 600;
+            font-size: 1rem;
             cursor: pointer;
-            transition: background 0.2s;
+            transition: opacity 0.2s, transform 0.1s;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 8px;
         }
 
-        button:hover {
-            background-color: var(--brand-color-hover);
+        button:active {
+            transform: scale(0.98);
+            opacity: 0.9;
         }
 
         button.danger-btn {
             background-color: var(--danger);
-            padding: 6px 10px;
-            font-size: 0.8rem;
-        }
-
-        button.danger-btn:hover {
-            background-color: #a1282c;
+            padding: 8px 12px;
+            font-size: 0.85rem;
+            border-radius: 6px;
         }
 
         button.secondary-btn {
             background-color: #4e5058;
-        }
-
-        button.secondary-btn:hover {
-            background-color: #6d6f78;
+            font-size: 0.9rem;
+            padding: 10px 16px;
         }
 
         /* Sezione Bottoni Links */
         .buttons-list {
             display: flex;
             flex-direction: column;
-            gap: 10px;
-            max-height: 250px;
+            gap: 12px;
+            max-height: 280px;
             overflow-y: auto;
+            padding-right: 4px;
         }
 
         .button-row {
             display: flex;
-            gap: 10px;
+            gap: 8px;
             align-items: center;
+            background-color: var(--bg-tertiary);
+            padding: 8px;
+            border-radius: 8px;
         }
 
         .button-row input {
-            flex: 1;
+            padding: 8px;
+            font-size: 0.9rem;
         }
 
         /* Preview stile Discord */
         .preview-container {
             background-color: var(--bg-primary);
-            padding: 16px;
+            padding: 14px;
             border-radius: 8px;
-            margin-top: 10px;
         }
 
         .discord-message {
             display: flex;
-            gap: 16px;
+            gap: 12px;
         }
 
         .discord-avatar {
-            width: 40px;
-            height: 40px;
+            width: 36px;
+            height: 36px;
             border-radius: 50%;
             background-color: var(--brand-color);
             background-size: cover;
@@ -251,78 +297,83 @@
 
         .discord-content {
             flex-grow: 1;
+            overflow: hidden;
         }
 
         .discord-author {
             display: flex;
             align-items: center;
-            gap: 8px;
+            gap: 6px;
             margin-bottom: 4px;
         }
 
         .author-name {
             font-weight: 600;
             color: var(--text-header);
+            font-size: 0.9rem;
         }
 
         .bot-tag {
             background-color: var(--brand-color);
             color: white;
-            font-size: 0.625rem;
+            font-size: 0.6rem;
             padding: 1px 4px;
             border-radius: 3px;
-            font-weight: 500;
+            font-weight: 600;
         }
 
         .discord-embed {
             border-left: 4px solid var(--brand-color);
             background-color: var(--bg-secondary);
-            padding: 12px 16px;
+            padding: 10px 12px;
             border-radius: 4px;
-            margin-top: 8px;
-            max-width: 520px;
+            margin-top: 6px;
         }
 
         .embed-title {
             font-weight: 700;
             color: var(--text-header);
-            margin-bottom: 8px;
+            font-size: 0.95rem;
+            margin-bottom: 6px;
         }
 
         .embed-description {
-            font-size: 0.9rem;
+            font-size: 0.85rem;
             white-space: pre-line;
             color: var(--text-normal);
+            word-break: break-word;
         }
 
         .embed-footer {
             margin-top: 8px;
-            font-size: 0.75rem;
+            font-size: 0.7rem;
             color: var(--text-muted);
         }
 
         .discord-buttons-preview {
             display: flex;
             flex-wrap: wrap;
-            gap: 8px;
+            gap: 6px;
             margin-top: 8px;
         }
 
         .discord-btn-preview {
             background-color: #4e5058;
             color: white;
-            padding: 6px 12px;
-            border-radius: 3px;
-            font-size: 0.8rem;
-            text-decoration: none;
+            padding: 6px 10px;
+            border-radius: 4px;
+            font-size: 0.75rem;
             display: inline-flex;
             align-items: center;
             gap: 4px;
-            pointer-events: none;
         }
     </style>
 </head>
 <body>
+
+    <div class="app-header">
+        <h1>⚙️ Webhook Manager - Evren City</h1>
+    </div>
 
     <div class="sidebar">
         <h2>📌 Webhook Salvati</h2>
@@ -336,10 +387,10 @@
         <div class="saved-webhooks" id="webhook-list"></div>
     </div>
 
-    <div class="main-content">
+    <div class="container">
         
         <div class="panel">
-            <h3>⚙️ Personalizza Messaggio</h3>
+            <h3>📝 Personalizza Messaggio</h3>
 
             <div class="form-group">
                 <label>URL Webhook Discord Destination</label>
@@ -356,8 +407,6 @@
                 <input type="url" id="bot-avatar" placeholder="https://..." oninput="updatePreview()">
             </div>
 
-            <hr style="border-color: rgba(255,255,255,0.05)">
-
             <div class="form-group">
                 <label>Titolo Embed</label>
                 <input type="text" id="embed-title" value="📜 TUTTI I REGOLAMENTI DI EVREN CITY 2026" oninput="updatePreview()">
@@ -372,7 +421,7 @@
                 <label>Colore Bordo Embed</label>
                 <div class="color-picker-wrapper">
                     <input type="color" id="embed-color" value="#5865f2" oninput="updatePreview()">
-                    <span id="color-hex">#5865f2</span>
+                    <span id="color-hex" style="font-weight: 600;">#5865f2</span>
                 </div>
             </div>
 
@@ -381,15 +430,13 @@
                 <input type="text" id="embed-footer" value="Evren City Roleplay • Tutti i diritti riservati" oninput="updatePreview()">
             </div>
 
-            <hr style="border-color: rgba(255,255,255,0.05)">
-
             <div class="form-group">
                 <label>🔗 Bottoni Regolamenti</label>
                 <div class="buttons-list" id="buttons-container"></div>
-                <button type="button" class="secondary-btn" onclick="addButtonInput()">+ Aggiungi Nuovo Bottone Link</button>
+                <button type="button" class="secondary-btn" onclick="addButtonInput()">+ Aggiungi Bottone Link</button>
             </div>
 
-            <button onclick="sendWebhookMessage()" style="font-size: 1.1rem; padding: 15px;">🚀 Invia Webhook a Discord</button>
+            <button onclick="sendWebhookMessage()" style="font-size: 1.1rem; padding: 16px; margin-top: 10px;">🚀 Invia Webhook a Discord</button>
         </div>
 
         <div class="panel">
@@ -419,11 +466,10 @@
     </div>
 
     <script>
-        // Preset dei regolamenti dal video salvato di default
         const defaultEvrenPreset = {
             id: 'evren-default-001',
             name: '⭐ Evren City Regolamenti (Default)',
-            url: '' // L'utente incollerà il suo URL webhook qui
+            url: ''
         };
 
         const defaultButtons = [
@@ -443,7 +489,6 @@
 
         let savedWebhooks = JSON.parse(localStorage.getItem('evren_webhooks')) || [];
         
-        // Assicura che il preset di default sia sempre presente nella lista
         if (!savedWebhooks.some(w => w.id === defaultEvrenPreset.id)) {
             savedWebhooks.unshift(defaultEvrenPreset);
         }
@@ -456,12 +501,11 @@
             updatePreview();
         };
 
-        // --- GESTIONE WEBHOOK SALVATI ---
         function saveWebhook() {
             const name = document.getElementById('new-webhook-name').value.trim();
             const url = document.getElementById('new-webhook-url').value.trim();
 
-            if (!name || !url) return alert('Inserisci sia un nome che un URL per il webhook!');
+            if (!name || !url) return alert('Inserisci sia un nome che un URL!');
 
             savedWebhooks.push({ id: 'wh-' + Date.now(), name, url });
             localStorage.setItem('evren_webhooks', JSON.stringify(savedWebhooks));
@@ -495,7 +539,7 @@
                 card.innerHTML = `
                     <div class="webhook-info">
                         <div class="webhook-name">${w.name}</div>
-                        <div class="webhook-url-preview">${w.url || 'Nessun URL impostato'}</div>
+                        <div class="webhook-url-preview">${w.url || 'Incolla il tuo URL'}</div>
                     </div>
                     ${w.id !== defaultEvrenPreset.id ? `<button class="danger-btn" onclick="deleteWebhook('${w.id}', event)">X</button>` : ''}
                 `;
@@ -503,7 +547,6 @@
             });
         }
 
-        // --- GESTIONE BOTTONI LINK ---
         function renderButtonsInputs() {
             const container = document.getElementById('buttons-container');
             container.innerHTML = '';
@@ -512,8 +555,8 @@
                 const row = document.createElement('div');
                 row.className = 'button-row';
                 row.innerHTML = `
-                    <input type="text" placeholder="Testo Bottone" value="${btn.label}" oninput="updateButtonData(${index}, 'label', this.value)">
-                    <input type="url" placeholder="URL Link" value="${btn.url}" oninput="updateButtonData(${index}, 'url', this.value)">
+                    <input type="text" placeholder="Nome" value="${btn.label}" oninput="updateButtonData(${index}, 'label', this.value)">
+                    <input type="url" placeholder="URL" value="${btn.url}" oninput="updateButtonData(${index}, 'url', this.value)">
                     <button type="button" class="danger-btn" onclick="removeButton(${index})">X</button>
                 `;
                 container.appendChild(row);
@@ -536,9 +579,8 @@
             renderButtonsInputs();
         }
 
-        // --- LIVE PREVIEW UPDATE ---
         function updatePreview() {
-            const botName = document.getElementById('bot-name').value || 'Discord Bot';
+            const botName = document.getElementById('bot-name').value || 'Bot Discord';
             const botAvatar = document.getElementById('bot-avatar').value || 'https://cdn.discordapp.com/embed/avatars/0.png';
             const title = document.getElementById('embed-title').value;
             const desc = document.getElementById('embed-desc').value;
@@ -553,7 +595,6 @@
             document.getElementById('pv-embed').style.borderColor = color;
             document.getElementById('color-hex').innerText = color;
 
-            // Renderizza bottoni nell'anteprima
             const btnPreviewContainer = document.getElementById('pv-buttons');
             btnPreviewContainer.innerHTML = '';
             linkButtons.forEach(b => {
@@ -566,10 +607,9 @@
             });
         }
 
-        // --- INVIO DEL MESSAGGIO AL WEBHOOK ---
         async function sendWebhookMessage() {
             const webhookUrl = document.getElementById('target-webhook-url').value.trim();
-            if (!webhookUrl) return alert('Incolla il tuo URL Webhook Discord prima di inviare!');
+            if (!webhookUrl) return alert('Incolla l\'URL del tuo Webhook prima di inviare!');
 
             const botName = document.getElementById('bot-name').value;
             const botAvatar = document.getElementById('bot-avatar').value;
@@ -579,7 +619,6 @@
             const colorInt = parseInt(colorHex.replace('#', ''), 16);
             const footer = document.getElementById('embed-footer').value;
 
-            // Costruzione lista dei link formattati
             let buttonsFormatted = "";
             if (linkButtons.length > 0) {
                 buttonsFormatted = "\n\n**📑 REGOLAMENTI DISPONIBILI:**\n" + linkButtons
@@ -610,13 +649,13 @@
                 });
 
                 if (response.ok || response.status === 204) {
-                    alert('✅ Messaggio inviato con successo al tuo canale Discord!');
+                    alert('✅ Messaggio inviato con successo a Discord!');
                 } else {
-                    alert(`❌ Errore durante l'invio (${response.status}). Verifica l'URL del Webhook.`);
+                    alert(`❌ Errore (${response.status}). Controlla l'URL del Webhook.`);
                 }
             } catch (err) {
                 console.error(err);
-                alert('❌ Si è verificato un errore di connessione. Controlla l\'URL del Webhook.');
+                alert('❌ Errore di rete o URL non valido.');
             }
         }
     </script>
