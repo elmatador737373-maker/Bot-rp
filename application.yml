@@ -3,11 +3,13 @@ server:
   address: 0.0.0.0
 
 lavalink:
-  plugins: []
+  plugins:
+    - dependency: "dev.lavalink.youtube:youtube-plugin:1.11.4" # Plugin ufficiale YouTube per Lavalink v4
+      repository: "https://maven.lavalink.dev/releases"
   server:
     password: "youshallnotpass"
     sources:
-      youtube: true
+      youtube: false # Disabilitiamo la vecchia sorgente nativa
       bandcamp: true
       soundcloud: true
       twitch: true
@@ -35,6 +37,17 @@ lavalink:
     youtubeSearchEnabled: true
     soundcloudSearchEnabled: true
     gc-warnings: true
+
+plugins:
+  youtube:
+    enabled: true
+    allowSearch: true
+    allowDirectVideoIds: true
+    allowDirectPlaylistIds: true
+    clients:
+      - MUSIC
+      - WEB
+      - TVHTML5
 
 metrics:
   prometheus:
