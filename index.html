@@ -473,7 +473,7 @@
             url: 'https://discord.com/api/webhooks/1533164184299114606/sjRPIh-IPuFTwOGXGhbNHeij-ixpi5dI9PegE8SaniJRbXqlQo9WLw2xV6YOJLyRr16x'
         };
 
-        // 🔗 LINK AGGIORNATI CON LE TUE URL
+        // 🔗 LINK DI BASE (INCLUSI I NUOVI RICHIESTI)
         const defaultButtons = [
             { label: '📜 Criminalità 2026', url: 'https://docs.google.com/document/d/1-OlPcuRHTGE_V8MBkCxDzDcSgU3OsJqdB3bT1yS4biA/edit?usp=drivesdk' },
             { label: '🚨 Rapine Camion', url: 'https://docs.google.com/document/d/14aSlHExowuo6Kr2ln3cyHGuNp4Sd-Pwj0JQfofLoC9c/edit?usp=drivesdk' },
@@ -486,7 +486,11 @@
             { label: '💰 Soldi Sporchi', url: 'https://docs.google.com/document/d/1HvBxGjLZAhzjEVG9mtxdEZYS4emC9_cuTU35_IRBzBE/edit?usp=drivesdk' },
             { label: '📄 Documenti Falsi', url: 'https://docs.google.com/document/d/1-7dbNYMjpdzdVsH4hbLFJuooKcN3rZnX4MMnivSNASo/edit?usp=drivesdk' },
             { label: '💵 Soldi Falsi', url: 'https://docs.google.com/document/d/11L6JaSd7g6Sb7ANIwSlEA9lJxDyWsskAZu6W6D4pYPc/edit?usp=drivesdk' },
-            { label: '📊 Tasse', url: 'https://docs.google.com/document/d/11ivjpwCazRJB2BhNtAkCEz8JhDF_9cKuPvRpk_dDIsg/edit?usp=drivesdk' }
+            { label: '📊 Tasse', url: 'https://docs.google.com/document/d/11ivjpwCazRJB2BhNtAkCEz8JhDF_9cKuPvRpk_dDIsg/edit?usp=drivesdk' },
+            { label: '💎 Traffico di Diamanti', url: 'https://docs.google.com/document/d/183wpPtyush8tpM2Ds26SUKBpTJlTeIGkjBNkyYHakUI/edit?usp=drivesdk' },
+            { label: '🏠 Furti in Casa', url: 'https://docs.google.com/document/d/166XEdEpcpXWVPwKyw43pi5gv7WWp8G0rmRnNls_gAL8/edit?usp=drivesdk' },
+            { label: '🚬 Tabacco e alcolici', url: 'https://docs.google.com/document/d/17VB_J3Zm75Rv8uu5MtupvDdSZnlAbjqf2T4SCdrK4nE/edit?usp=drivesdk' },
+            { label: '💼 Business', url: 'https://docs.google.com/document/d/16PY8LjECS9ERMiWGj2A1jsjRHTNhmENmKSGHwHVxG-Y/edit?usp=drivesdk' }
         ];
 
         let savedWebhooks = JSON.parse(localStorage.getItem('evren_webhooks')) || [];
@@ -495,13 +499,18 @@
             savedWebhooks.unshift(defaultEvrenPreset);
         }
 
-        let linkButtons = [...defaultButtons];
+        // CARICAMENTO ED EVENTUALE SALVATAGGIO DEI BOTTONI NEL BROWSER
+        let linkButtons = JSON.parse(localStorage.getItem('evren_buttons')) || [...defaultButtons];
 
         window.onload = () => {
             renderWebhooks();
             renderButtonsInputs();
             updatePreview();
         };
+
+        function saveButtonsToStorage() {
+            localStorage.setItem('evren_buttons', JSON.stringify(linkButtons));
+        }
 
         function saveWebhook() {
             const name = document.getElementById('new-webhook-name').value.trim();
@@ -568,16 +577,19 @@
 
         function addButtonInput() {
             linkButtons.push({ label: 'Nuovo Link', url: 'https://google.com' });
+            saveButtonsToStorage();
             renderButtonsInputs();
         }
 
         function updateButtonData(index, field, value) {
             linkButtons[index][field] = value;
+            saveButtonsToStorage();
             updatePreview();
         }
 
         function removeButton(index) {
             linkButtons.splice(index, 1);
+            saveButtonsToStorage();
             renderButtonsInputs();
         }
 
@@ -613,7 +625,6 @@
             let webhookUrl = document.getElementById('target-webhook-url').value.trim();
             if (!webhookUrl) return alert('Incolla l\'URL del tuo Webhook prima di inviare!');
 
-            // Assicura che l'URL contenga il parametro per attivare i bottoni
             if (!webhookUrl.includes('with_components=true')) {
                 webhookUrl += (webhookUrl.includes('?') ? '&' : '?') + 'with_components=true';
             }
@@ -626,7 +637,9 @@
             const colorInt = parseInt(colorHex.replace('#', ''), 16);
             const footer = document.getElementById('embed-footer').value;
 
-            // Raggruppa i bottoni in Action Rows (massimo 4 bottoni per riga)
+            // Salvataggio bottoni prima dell'invio
+            saveButtonsToStorage();
+
             const validButtons = linkButtons.filter(b => b.label && b.url);
             const actionRows = [];
             const chunkSize = 4;
